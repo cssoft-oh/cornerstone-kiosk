@@ -127,9 +127,11 @@ function wizNext() {
     const first = (document.getElementById('first').value || '').trim();
     const last = (document.getElementById('last').value || '').trim();
     const dob = document.getElementById('dob').value || '';
+    const sex = document.getElementById('sex').value || '';
     const ssn = (document.getElementById('ssn').value || '').trim();
     if (!last || !first) return alert('Last and first name are required.');
     if (!dob) return alert('Date of birth is required.');
+    if (!sex) return alert('Sex is required.');
     const digits = ssn.replace(/\D/g, '');
     if (digits.length !== 9) return alert('SSN must be a full 9-digit number (used to cross-reference prior bookings).');
   }
