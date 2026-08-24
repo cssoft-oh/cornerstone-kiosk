@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <title>Cornerstone Kiosk — Arresting Officer Intake</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230f2b46'%3E%3Cpath d='M12 2L3 7v6c0 5 4 8 9 9 5-1 9-4 9-9V7l-9-5z'/%3E%3C/svg%3E"/>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+  <div id="lock" class="lock-screen">
+    <div class="lock-card">
+      <div class="lock-brand">
+        <div class="lock-shield">
+          <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="lock-title">Cornerstone Kiosk</div>
+          <div class="lock-sub">Arresting Officer Intake</div>
+        </div>
+      </div>
+      <div class="lock-hint">This kiosk queues an inmate for booking. Sign in with your kiosk credentials.</div>
+      <form id="loginForm" autocomplete="off" onsubmit="return kioskLogin(event)">
+        <div class="fg">
+          <label>User</label>
+          <input id="user" type="text" autocomplete="off" placeholder="Enter username" required/>
+        </div>
+        <div class="fg">
+          <label>Password</label>
+          <input id="pw" type="password" autocomplete="new-password" placeholder="Enter password" required/>
+        </div>
+        <div id="loginErr" class="err" style="display:none"></div>
+        <button type="submit" class="btn btn-primary btn-big">Unlock Kiosk</button>
+      </form>
+      <div class="lock-footer">© 2026 Cornerstone Technology Systems, LLC</div>
+    </div>
+  </div>
+
+  <div id="app" class="app-screen" style="display:none">
+    <header class="app-header">
+      <div class="hdr-brand">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <div>
+          <div class="hdr-title">Cornerstone Kiosk</div>
+          <div class="hdr-sub">Arresting Officer Intake</div>
+        </div>
+      </div>
+      <div class="hdr-right">
+        <div class="hdr-clock" id="hdrClock">--:--</div>
+        <button class="btn btn-ghost" onclick="kioskLogout()">Lock</button>
+      </div>
+    </header>
+
+    <div class="app-body">
+      <div class="wizard-wrap">
+        <div class="progress" id="progress">
+          <div class="progress-step" data-step="0"><span class="pn">1</span><span class="pl">Inmate</span></div>
+          <div class="progress-step" data-step="1"><span class="pn">2</span><span class="pl">Arresting Officer</span></div>
+          <div class="progress-step" data-step="2"><span class="pn">3</span><span class="pl">Charges</span></div>
+          <div class="progress-step" data-step="3"><span class="pn">4</span><span class="pl">Review &amp; Submit</span></div>
+        </div>
+
+        <div id="wizStep0" class="step-panel">
+          <h1>Inmate information</h1>
+          <p class="step-help">Type what you have. Booking will complete the record when they take the person in.</p>
+          <div class="grid-2">
+            <div class="fg">
+              <label>Last name *</label>
+              <input id="last" type="text" autocomplete="off" placeholder="LAST"/>
+            </div>
+            <div class="fg">
+              <label>First name *</label>
+              <input id="first" type="text" autocomplete="off" placeholder="First"/>
+            </div>
+            <div class="fg">
+              <label>Middle</label>
+              <input id="middle" type="text" autocomplete="off" placeholder="Middle (optional)"/>
+            </div>
+            <div class="fg">
+              <label>Date of birth *</label>
+              <input id="dob" type="date"/>
+            </div>
+            <div class="fg">
+              <label>Sex</label>
+              <select id="sex">
+                <option value="">— Select —</option>
+                <option>M</option>
+                <option>F</option>
+                <option>Other / Unknown</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label>SSN <span class="lbl-sub">(last 4 OK)</span></label>
+              <input id="ssn" type="text" inputmode="numeric" autocomplete="off" placeholder="XXX-XX-XXXX or last 4" maxlength="11"/>
+            </div>
+          </div>
+          <div class="step-nav">
+            <div></div>
+            <button class="btn btn-primary btn-big" onclick="wizNext()">Continue →</button>
+          </div>
+        </div>
+
+        <div id="wizStep1" class="step-panel" style="display:none">
+          <h1>Arresting officer</h1>
+          <p class="step-help">Who is bringing this person in.</p>
+          <div class="grid-2">
+            <div class="fg fg-full">
+              <label>Arresting agency *</label>
+              <input id="agency" type="text" autocomplete="off" placeholder="e.g. Bellefontaine PD, Logan County Sheriff's Office"/>
+            </div>
+            <div class="fg">
+              <label>Officer name *</label>
+              <input id="officer" type="text" autocomplete="off" placeholder="LAST, First"/>
+            </div>
+            <div class="fg">
+              <label>Badge number *</label>
+              <input id="badge" type="text" autocomplete="off" placeholder="e.g. 4412"/>
+            </div>
+            <div class="fg">
+              <label>Arrest date/time</label>
+              <input id="arrestTime" type="datetime-local"/>
+            </div>
+            <div class="fg">
+              <label>Arrest location</label>
+              <input id="arrestLoc" type="text" autocomplete="off" placeholder="Street or landmark (optional)"/>
+            </div>
+          </div>
+          <div class="step-nav">
+            <button class="btn btn-ghost btn-big" onclick="wizPrev()">← Back</button>
+            <button class="btn btn-primary btn-big" onclick="wizNext()">Continue →</button>
+          </div>
+        </div>
+
+        <div id="wizStep2" class="step-panel" style="display:none">
+          <h1>Charges</h1>
+          <p class="step-help">Type any part of a code (e.g. <code>2903</code>) or description (e.g. <code>assault</code>) to search. Tap a match to add it. You can add as many as you need.</p>
+          <div class="fg fg-full">
+            <label>Search ORC / statute library</label>
+            <input id="chargeSearch" type="text" autocomplete="off" placeholder="Start typing…" oninput="onChargeSearch()"/>
+            <div id="chargeResults" class="charge-results"></div>
+          </div>
+          <div id="chargeList" class="charge-list"></div>
+          <div class="fg fg-full" style="margin-top:14px">
+            <label>Additional notes for booking</label>
+            <textarea id="notes" rows="3" autocomplete="off" placeholder="Anything the booking officer should know (behavioral, medical, victim info, contraband, etc.)"></textarea>
+          </div>
+          <div class="step-nav">
+            <button class="btn btn-ghost btn-big" onclick="wizPrev()">← Back</button>
+            <button class="btn btn-primary btn-big" onclick="wizNext()">Review →</button>
+          </div>
+        </div>
+
+        <div id="wizStep3" class="step-panel" style="display:none">
+          <h1>Review and submit</h1>
+          <p class="step-help">Confirm the information below. Once you submit, the booking officer will see this inmate in the pending-completion queue.</p>
+          <div id="review" class="review-block"></div>
+          <div id="submitErr" class="err" style="display:none;margin-top:10px"></div>
+          <div class="step-nav">
+            <button class="btn btn-ghost btn-big" onclick="wizPrev()">← Back</button>
+            <button id="submitBtn" class="btn btn-primary btn-big" onclick="submitIntake()">Submit to Booking</button>
+          </div>
+        </div>
+
+        <div id="wizDone" class="step-panel" style="display:none">
+          <div class="done-mark">✓</div>
+          <h1>Submitted to booking</h1>
+          <p class="step-help" id="doneMsg">The booking officer has been notified. This kiosk will lock in a few seconds — you can also press Lock now.</p>
+          <div class="step-nav">
+            <div></div>
+            <button class="btn btn-primary btn-big" onclick="kioskLogout()">Lock kiosk</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="app-footer">
+      Cornerstone Kiosk · queued arrests land in Jail under <b>Pending Completion</b>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
