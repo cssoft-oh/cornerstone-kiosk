@@ -141,8 +141,11 @@ function wizNext() {
     if (!last || !first) return alert('Last and first name are required.');
     if (!dob) return alert('Date of birth is required.');
     if (!sex) return alert('Sex is required.');
-    const digits = ssn.replace(/\D/g, '');
-    if (digits.length !== 9) return alert('SSN must be a full 9-digit number (used to cross-reference prior bookings).');
+    const noSsn = !!(document.getElementById('noSsn') && document.getElementById('noSsn').checked);
+    if (!noSsn) {
+      const digits = ssn.replace(/\D/g, '');
+      if (digits.length !== 9) return alert('Enter a full 9-digit SSN, or tick "No SSN available" if the person does not have one.');
+    }
   }
   if (wiz.step === 1) {
     const agency = (document.getElementById('agency').value || '').trim();
@@ -263,7 +266,8 @@ function readForm() {
     const [y, m, d] = dobRaw.split('-');
     dobUS = m + '/' + d + '/' + y;
   }
-  const ssnRaw = (document.getElementById('ssn').value || '').trim();
+  const noSsn = !!(document.getElementById('noSsn') && document.getElementById('noSsn').checked);
+  const ssnRaw = noSsn ? '' : (document.getElementById('ssn').value || '').trim();
   const ssnDigits = ssnRaw.replace(/\D/g, '');
   const ssnFormatted = ssnDigits.length === 9
     ? ssnDigits.slice(0, 3) + '-' + ssnDigits.slice(3, 5) + '-' + ssnDigits.slice(5)
@@ -281,8 +285,9 @@ function readForm() {
       dob: dobRaw,            // ISO YYYY-MM-DD (as-typed)
       dobUS,                  // MM/DD/YYYY mirror for display
       sex: document.getElementById('sex').value || '',
-      ssn: ssnFormatted,      // XXX-XX-XXXX
-      ssnDigits,              // raw 9 digits for cross-ref
+      ssn: ssnFormatted,      // XXX-XX-XXXX (blank when noSsn)
+      ssnDigits,              // raw 9 digits for cross-ref (blank when noSsn)
+      noSsn,                  // true when arresting officer marked "No SSN available"
     },
     arresting: (function(){
       const oL = (document.getElementById('officerLast').value || '').trim();
@@ -384,6 +389,46 @@ function validateSsn() {
 }
 window.onSsnInput = onSsnInput;
 window.validateSsn = validateSsn;
+
+// When the officer ticks "No SSN available", grey out and blank the SSN
+// input, drop the red-required asterisk, and swap the hint copy. Booking
+// downstream sees ssn:'' and a noSsn:true flag so the intake step in Jail
+// can display the same "No SSN" state without asking again.
+function onNoSsnToggle(e) {
+  const on = !!e.target.checked;
+  const ssn = document.getElementById('ssn');
+  const tag = document.getElementById('ssnLabelTag');
+  const hint = document.getElementById('ssnHint');
+  if (on) {
+    ssn.value = '';
+    ssn.disabled = true;
+    ssn.style.background = 'var(--paper, #f8fafc)';
+    ssn.style.borderColor = '';
+    ssn.placeholder = 'Not available';
+    if (tag) { tag.textContent = '(optional)'; tag.style.color = 'var(--slate)'; }
+    if (hint) hint.textContent = 'Marked as "No SSN available" — booking will complete this record.';
+  } else {
+    ssn.disabled = false;
+    ssn.style.background = '';
+    ssn.placeholder = 'XXX-XX-XXXX';
+    if (tag) { tag.textContent = '*'; tag.style.color = ''; }
+    if (hint) hint.textContent = 'Full 9-digit SSN — auto-formats as you type. Used to cross-reference prior bookings.';
+  }
+}
+window.onNoSsnToggle = onNoSsnToggle;
+
+// Fill the arrest-time picker with the current moment in the officer's
+// local time zone. datetime-local expects "YYYY-MM-DDTHH:MM" with no
+// timezone suffix — using toISOString() would shift into UTC, so we
+// build the string from local getters.
+function setArrestNow() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const v = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const el = document.getElementById('arrestTime');
+  if (el) { el.value = v; el.focus(); }
+}
+window.setArrestNow = setArrestNow;
 
 // ─── Google Places arrest-location autocomplete ─────────────────────────────
 // Loaded via the script tag in index.html. When the officer opens the wizard,
