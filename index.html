@@ -94,8 +94,9 @@
               </select>
             </div>
             <div class="fg">
-              <label>SSN <span class="lbl-sub">(last 4 OK)</span></label>
-              <input id="ssn" type="text" inputmode="numeric" autocomplete="off" placeholder="XXX-XX-XXXX or last 4" maxlength="11"/>
+              <label>SSN *</label>
+              <input id="ssn" type="text" inputmode="numeric" autocomplete="off" placeholder="XXX-XX-XXXX" maxlength="11" oninput="onSsnInput(event)" onblur="validateSsn()"/>
+              <div id="ssnHint" style="font-size:11px;color:var(--slate);margin-top:4px">Full 9-digit SSN — auto-formats as you type. Used to cross-reference prior bookings.</div>
             </div>
           </div>
           <div class="step-nav">
@@ -124,9 +125,11 @@
               <label>Arrest date/time</label>
               <input id="arrestTime" type="datetime-local"/>
             </div>
-            <div class="fg">
-              <label>Arrest location</label>
-              <input id="arrestLoc" type="text" autocomplete="off" placeholder="Street or landmark (optional)"/>
+            <div class="fg fg-full">
+              <label>Arrest location *</label>
+              <input id="arrestLoc" type="text" autocomplete="off" placeholder="Start typing an address — Google Places auto-completes"/>
+              <div id="arrestLocHint" style="font-size:11px;color:var(--slate);margin-top:4px">Required. Type or pick from suggestions.</div>
+              <input type="hidden" id="arrestLocDetails"/>
             </div>
           </div>
           <div class="step-nav">
@@ -183,5 +186,19 @@
   </div>
 
   <script src="app.js"></script>
+  <script>
+    // Google Maps Places script — loaded after app.js so window.initKioskMaps
+    // is defined by the time the callback fires. Places autocomplete binds
+    // to #arrestLoc when the user opens the wizard. If Maps fails to load
+    // (offline, key restricted, etc.), the input degrades to plain text
+    // and the officer types the address free-form.
+    (function(){
+      const s = document.createElement('script');
+      s.async = true;
+      s.defer = true;
+      s.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyAcvadlqFCkXrGZxGbVAGk_SY9lzTZ9fBU&libraries=places&callback=initKioskMaps';
+      document.head.appendChild(s);
+    })();
+  </script>
 </body>
 </html>

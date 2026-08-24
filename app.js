@@ -63,6 +63,8 @@ function kioskLogin(e) {
   resetWizard();
   armIdleTimer();
   loadChargeLibrary();
+  _initAgencyDatalist();
+  _wireArrestLocAutocomplete();
   return false;
 }
 
@@ -88,10 +90,14 @@ function armIdleTimer() {
 // ─── Wizard ──────────────────────────────────────────────────────────────────
 function resetWizard() {
   wiz = { step: 0, charges: [] };
-  ['last','first','middle','dob','sex','ssn','agency','officer','badge','arrestTime','arrestLoc','chargeSearch','notes'].forEach(id => {
+  ['last','first','middle','dob','sex','ssn','agency','officer','badge','arrestTime','arrestLoc','arrestLocDetails','chargeSearch','notes'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  const hint = document.getElementById('arrestLocHint');
+  if (hint) hint.textContent = 'Required. Type or pick from suggestions.';
+  const ssn = document.getElementById('ssn');
+  if (ssn) ssn.style.borderColor = '';
   renderChargeList();
   showStep(0);
   const errEl = document.getElementById('submitErr');
@@ -121,14 +127,19 @@ function wizNext() {
     const first = (document.getElementById('first').value || '').trim();
     const last = (document.getElementById('last').value || '').trim();
     const dob = document.getElementById('dob').value || '';
+    const ssn = (document.getElementById('ssn').value || '').trim();
     if (!last || !first) return alert('Last and first name are required.');
     if (!dob) return alert('Date of birth is required.');
+    const digits = ssn.replace(/\D/g, '');
+    if (digits.length !== 9) return alert('SSN must be a full 9-digit number (used to cross-reference prior bookings).');
   }
   if (wiz.step === 1) {
     const agency = (document.getElementById('agency').value || '').trim();
     const officer = (document.getElementById('officer').value || '').trim();
     const badge = (document.getElementById('badge').value || '').trim();
+    const loc = (document.getElementById('arrestLoc').value || '').trim();
     if (!agency || !officer || !badge) return alert('Agency, officer, and badge number are required.');
+    if (!loc) return alert('Arrest location is required.');
   }
   if (wiz.step === 2) {
     if (!wiz.charges.length) return alert('Add at least one charge before continuing.');
@@ -229,14 +240,35 @@ function renderChargeList() {
 
 // ─── Review ──────────────────────────────────────────────────────────────────
 function readForm() {
+  const dobRaw = document.getElementById('dob').value || '';
+  // DOB always saves in ISO YYYY-MM-DD (from <input type="date">) so the
+  // downstream booking wizard's date-parsing stays consistent. We also
+  // ship a US-format mirror (MM/DD/YYYY) for display / SO# generation.
+  let dobUS = '';
+  if (dobRaw && /^\d{4}-\d{2}-\d{2}$/.test(dobRaw)) {
+    const [y, m, d] = dobRaw.split('-');
+    dobUS = m + '/' + d + '/' + y;
+  }
+  const ssnRaw = (document.getElementById('ssn').value || '').trim();
+  const ssnDigits = ssnRaw.replace(/\D/g, '');
+  const ssnFormatted = ssnDigits.length === 9
+    ? ssnDigits.slice(0, 3) + '-' + ssnDigits.slice(3, 5) + '-' + ssnDigits.slice(5)
+    : ssnRaw;
+  let arrestLocationDetails = null;
+  try {
+    const raw = document.getElementById('arrestLocDetails').value;
+    if (raw) arrestLocationDetails = JSON.parse(raw);
+  } catch (_) {}
   return {
     inmate: {
       lastName: (document.getElementById('last').value || '').trim(),
       firstName: (document.getElementById('first').value || '').trim(),
       middleName: (document.getElementById('middle').value || '').trim(),
-      dob: document.getElementById('dob').value || '',
+      dob: dobRaw,            // ISO YYYY-MM-DD (as-typed)
+      dobUS,                  // MM/DD/YYYY mirror for display
       sex: document.getElementById('sex').value || '',
-      ssn: (document.getElementById('ssn').value || '').trim(),
+      ssn: ssnFormatted,      // XXX-XX-XXXX
+      ssnDigits,              // raw 9 digits for cross-ref
     },
     arresting: {
       agency: (document.getElementById('agency').value || '').trim(),
@@ -244,6 +276,7 @@ function readForm() {
       badge: (document.getElementById('badge').value || '').trim(),
       arrestTime: document.getElementById('arrestTime').value || '',
       arrestLocation: (document.getElementById('arrestLoc').value || '').trim(),
+      arrestLocationDetails,  // {placeId, formattedAddress, lat, lng, street, city, state, zip, ...} or null
     },
     charges: wiz.charges.slice(),
     notes: (document.getElementById('notes').value || '').trim(),
@@ -303,6 +336,118 @@ async function submitIntake() {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Submit to Booking';
   }
+}
+
+// ─── SSN formatting ──────────────────────────────────────────────────────────
+// XXX-XX-XXXX auto-format as digits are typed. Handles paste of raw 9-digit
+// numbers or fragments — never overshoots the maxlength cap. Visual state:
+// green border once we have 9 digits, red on blur if fewer than 9.
+function onSsnInput(e) {
+  const el = e.target;
+  const digits = el.value.replace(/\D/g, '').slice(0, 9);
+  let formatted = digits;
+  if (digits.length > 5) formatted = digits.slice(0, 3) + '-' + digits.slice(3, 5) + '-' + digits.slice(5);
+  else if (digits.length > 3) formatted = digits.slice(0, 3) + '-' + digits.slice(3);
+  el.value = formatted;
+  el.style.borderColor = digits.length === 9 ? '#16a34a' : '';
+}
+function validateSsn() {
+  const el = document.getElementById('ssn');
+  const digits = (el.value || '').replace(/\D/g, '');
+  el.style.borderColor = digits.length === 9 ? '#16a34a' : (digits.length === 0 ? '' : '#b91c1c');
+}
+window.onSsnInput = onSsnInput;
+window.validateSsn = validateSsn;
+
+// ─── Google Places arrest-location autocomplete ─────────────────────────────
+// Loaded via the script tag in index.html. When the officer opens the wizard,
+// we bind Autocomplete to #arrestLoc and stash the picked Place's structured
+// details (address, lat/lng, components) in the hidden #arrestLocDetails so
+// the booking record downstream carries a proper structured arrestLocation
+// rather than a free-text string.
+let _kioskMapsReady = false;
+let _kioskAutocomplete = null;
+window.initKioskMaps = function () {
+  _kioskMapsReady = true;
+  _wireArrestLocAutocomplete();
+};
+function _wireArrestLocAutocomplete() {
+  if (!_kioskMapsReady) return;
+  if (_kioskAutocomplete) return;
+  const inp = document.getElementById('arrestLoc');
+  if (!inp || !window.google || !google.maps || !google.maps.places) return;
+  try {
+    _kioskAutocomplete = new google.maps.places.Autocomplete(inp, {
+      types: ['geocode'],
+      fields: ['place_id', 'formatted_address', 'geometry', 'address_components'],
+    });
+    _kioskAutocomplete.addListener('place_changed', () => {
+      const place = _kioskAutocomplete.getPlace();
+      if (!place || !place.geometry) return;
+      const comps = {};
+      (place.address_components || []).forEach(c => {
+        (c.types || []).forEach(t => { comps[t] = c.short_name; });
+      });
+      const details = {
+        placeId: place.place_id || '',
+        formattedAddress: place.formatted_address || inp.value,
+        lat: place.geometry.location ? place.geometry.location.lat() : null,
+        lng: place.geometry.location ? place.geometry.location.lng() : null,
+        streetNumber: comps.street_number || '',
+        street: comps.route || '',
+        city: comps.locality || comps.sublocality || comps.postal_town || '',
+        state: comps.administrative_area_level_1 || '',
+        zip: comps.postal_code || '',
+        county: comps.administrative_area_level_2 || '',
+        country: comps.country || '',
+        enteredAt: new Date().toISOString(),
+      };
+      const hidden = document.getElementById('arrestLocDetails');
+      if (hidden) hidden.value = JSON.stringify(details);
+      const hint = document.getElementById('arrestLocHint');
+      if (hint) hint.textContent = '✓ Verified: ' + details.formattedAddress;
+    });
+  } catch (e) {
+    console.warn('[Kiosk] Places autocomplete init failed — falling back to free-text.', e && e.message);
+  }
+}
+
+// ─── Agency autocomplete ─────────────────────────────────────────────────────
+// Common arresting agencies pre-populate the dropdown. The input is a
+// datalist-bound text field — the officer can type to filter, pick from
+// the dropdown, or type an agency that isn't listed (free form). No lock-in.
+const ARRESTING_AGENCIES = [
+  'Logan County Sheriff\'s Office',
+  'Bellefontaine Police Department',
+  'Union County Sheriff\'s Office',
+  'Hardin County Sheriff\'s Office',
+  'Champaign County Sheriff\'s Office',
+  'Auglaize County Sheriff\'s Office',
+  'Shelby County Sheriff\'s Office',
+  'Marysville Police Department',
+  'Kenton Police Department',
+  'Urbana Police Department',
+  'Ohio State Highway Patrol',
+  'Ohio State Highway Patrol — Bellefontaine Post',
+  'Ohio Bureau of Criminal Investigation (BCI)',
+  'US Marshals Service',
+  'Federal Bureau of Investigation (FBI)',
+  'Drug Enforcement Administration (DEA)',
+  'Bureau of Alcohol, Tobacco, Firearms &amp; Explosives (ATF)',
+  'Immigration and Customs Enforcement (ICE)',
+  'US Border Patrol',
+  'Adult Parole Authority',
+  'Ohio Adult Parole Authority',
+  'Court Order / Bench Warrant',
+];
+function _initAgencyDatalist() {
+  if (document.getElementById('agencyDL')) return;
+  const dl = document.createElement('datalist');
+  dl.id = 'agencyDL';
+  dl.innerHTML = ARRESTING_AGENCIES.map(a => '<option value="' + escAttr(a) + '"></option>').join('');
+  document.body.appendChild(dl);
+  const inp = document.getElementById('agency');
+  if (inp) { inp.setAttribute('list', 'agencyDL'); inp.setAttribute('placeholder', 'Type or pick — agency not listed? Just type it.'); }
 }
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
