@@ -326,9 +326,14 @@ async function submitIntake() {
   submitBtn.disabled = true;
   submitBtn.textContent = 'Submitting…';
   try {
+    // Content-Type is text/plain (not application/json) so the browser
+    // treats this as a "simple" CORS request and skips the preflight —
+    // Azure SWA's edge intercepts OPTIONS before our Function can respond
+    // with CORS headers, which was blocking every submit. The Function
+    // reads the raw body and JSON-parses it manually.
     const res = await fetch(JAIL_API_BASE + '/public/kiosk-arrests', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
