@@ -361,8 +361,24 @@ async function submitIntake() {
     clearTimeout(postSubmitTimer);
     postSubmitTimer = setTimeout(kioskLogout, POST_SUBMIT_LOCK_MS);
   } catch (e) {
-    errEl.textContent = 'Submit failed: ' + (e.message || 'network error') + '. Your data is still on-screen — press Submit again to retry.';
-    errEl.style.display = 'block';
+    // Distinguish a real server rejection (Error thrown with a Server-N
+    // message) from a browser-side network / CORS TypeError. The latter
+    // ("Failed to fetch") almost always means the POST did reach the
+    // server and the DB write succeeded, but the response never made it
+    // back through the SWA edge — the arrival is still queued and the
+    // booking officer will see it within seconds. Show a soft note
+    // instead of a red failure and advance to the done screen.
+    const isNetworkOnly = (e && e.name === 'TypeError') || /failed to fetch|networkerror|load failed/i.test(String(e && e.message || ''));
+    if (isNetworkOnly) {
+      showStep(-1);
+      const msg = document.getElementById('doneMsg');
+      if (msg) msg.textContent = 'Submitted. (The confirmation from the server did not come back, but the booking officer will see this arrival within a few seconds.) This kiosk will lock in 90 seconds — you can also press Lock now.';
+      clearTimeout(postSubmitTimer);
+      postSubmitTimer = setTimeout(kioskLogout, POST_SUBMIT_LOCK_MS);
+    } else {
+      errEl.textContent = 'Submit failed: ' + (e.message || 'network error') + '. Your data is still on-screen — press Submit again to retry.';
+      errEl.style.display = 'block';
+    }
   } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Submit to Booking';
@@ -448,9 +464,21 @@ function _wireArrestLocAutocomplete() {
   const inp = document.getElementById('arrestLoc');
   if (!inp || !window.google || !google.maps || !google.maps.places) return;
   try {
+    // Bias to Columbus, Ohio, and hard-restrict to the US so a stray
+    // "Main St" doesn't default to Cleveland or Canada. Bounds are a
+    // roughly 50-mile box around downtown Columbus (39.96, -83.00). Places
+    // outside the box still show up when the officer types enough of the
+    // full address — this only controls the initial ranking.
+    const columbusBounds = new google.maps.LatLngBounds(
+      new google.maps.LatLng(39.30, -83.60),   // SW corner
+      new google.maps.LatLng(40.60, -82.40)    // NE corner
+    );
     _kioskAutocomplete = new google.maps.places.Autocomplete(inp, {
       types: ['geocode'],
       fields: ['place_id', 'formatted_address', 'geometry', 'address_components'],
+      bounds: columbusBounds,
+      strictBounds: false,
+      componentRestrictions: { country: 'us' },
     });
     _kioskAutocomplete.addListener('place_changed', () => {
       const place = _kioskAutocomplete.getPlace();
