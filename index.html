@@ -181,10 +181,10 @@
         <div id="wizDone" class="step-panel" style="display:none">
           <div class="done-mark">✓</div>
           <h1>Submitted to booking</h1>
-          <p class="step-help" id="doneMsg">The booking officer has been notified. This kiosk will lock in a few seconds — you can also press Lock now.</p>
+          <p class="step-help" id="doneMsg">The booking officer has been notified. Pick <b>Start another</b> to submit another arrival, or <b>Lock kiosk</b> to hand it back to the lock screen.</p>
           <div class="step-nav">
-            <div></div>
-            <button class="btn btn-primary btn-big" onclick="kioskLogout()">Lock kiosk</button>
+            <button class="btn btn-ghost btn-big" onclick="kioskLogout()">Lock kiosk</button>
+            <button class="btn btn-primary btn-big" onclick="restartKiosk()">Start another arrival →</button>
           </div>
         </div>
       </div>

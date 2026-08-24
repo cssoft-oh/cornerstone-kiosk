@@ -76,6 +76,15 @@ function kioskLogout() {
   document.getElementById('user').focus();
   resetWizard();
 }
+// Restart — same signed-in session, wipe the wizard and jump back to
+// step 1 for another arrival. Used from the post-submit screen so an
+// officer doing back-to-back intakes never has to unlock again.
+function restartKiosk() {
+  clearTimeout(postSubmitTimer);
+  resetWizard();
+  armIdleTimer();
+}
+window.restartKiosk = restartKiosk;
 
 function armIdleTimer() {
   clearTimeout(idleTimer);
