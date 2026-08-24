@@ -90,7 +90,7 @@ function armIdleTimer() {
 // ─── Wizard ──────────────────────────────────────────────────────────────────
 function resetWizard() {
   wiz = { step: 0, charges: [] };
-  ['last','first','middle','dob','sex','ssn','agency','officer','badge','arrestTime','arrestLoc','arrestLocDetails','chargeSearch','notes'].forEach(id => {
+  ['last','first','middle','dob','sex','ssn','agency','officerLast','officerFirst','badge','arrestTime','arrestLoc','arrestLocDetails','chargeSearch','notes'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -135,10 +135,13 @@ function wizNext() {
   }
   if (wiz.step === 1) {
     const agency = (document.getElementById('agency').value || '').trim();
-    const officer = (document.getElementById('officer').value || '').trim();
+    const oL = (document.getElementById('officerLast').value || '').trim();
+    const oF = (document.getElementById('officerFirst').value || '').trim();
     const badge = (document.getElementById('badge').value || '').trim();
     const loc = (document.getElementById('arrestLoc').value || '').trim();
-    if (!agency || !officer || !badge) return alert('Agency, officer, and badge number are required.');
+    if (!agency) return alert('Arresting agency is required.');
+    if (!oL || !oF) return alert('Officer last and first name are required.');
+    if (!badge) return alert('Badge number is required.');
     if (!loc) return alert('Arrest location is required.');
   }
   if (wiz.step === 2) {
@@ -270,14 +273,21 @@ function readForm() {
       ssn: ssnFormatted,      // XXX-XX-XXXX
       ssnDigits,              // raw 9 digits for cross-ref
     },
-    arresting: {
-      agency: (document.getElementById('agency').value || '').trim(),
-      officer: (document.getElementById('officer').value || '').trim(),
-      badge: (document.getElementById('badge').value || '').trim(),
-      arrestTime: document.getElementById('arrestTime').value || '',
-      arrestLocation: (document.getElementById('arrestLoc').value || '').trim(),
-      arrestLocationDetails,  // {placeId, formattedAddress, lat, lng, street, city, state, zip, ...} or null
-    },
+    arresting: (function(){
+      const oL = (document.getElementById('officerLast').value || '').trim();
+      const oF = (document.getElementById('officerFirst').value || '').trim();
+      const combined = [oL, oF].filter(Boolean).join(', ');
+      return {
+        agency: (document.getElementById('agency').value || '').trim(),
+        officer: combined,       // "LAST, First" — downstream displays that expect a single field
+        officerLast: oL,
+        officerFirst: oF,
+        badge: (document.getElementById('badge').value || '').trim(),
+        arrestTime: document.getElementById('arrestTime').value || '',
+        arrestLocation: (document.getElementById('arrestLoc').value || '').trim(),
+        arrestLocationDetails,  // {placeId, formattedAddress, lat, lng, street, city, state, zip, ...} or null
+      };
+    })(),
     charges: wiz.charges.slice(),
     notes: (document.getElementById('notes').value || '').trim(),
   };

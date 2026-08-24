@@ -7,6 +7,12 @@
   <meta name="mobile-web-app-capable" content="yes"/>
   <title>Cornerstone Kiosk — Arresting Officer Intake</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230f2b46'%3E%3Cpath d='M12 2L3 7v6c0 5 4 8 9 9 5-1 9-4 9-9V7l-9-5z'/%3E%3C/svg%3E"/>
+  <!-- Match the rest of the Cornerstone suite: Source Sans 3 for UI copy,
+       JetBrains Mono for numbers/codes. Preconnect + display=swap so the
+       kiosk still renders instantly if the font takes a moment. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
@@ -114,8 +120,12 @@
               <input id="agency" type="text" autocomplete="off" placeholder="e.g. Bellefontaine PD, Logan County Sheriff's Office"/>
             </div>
             <div class="fg">
-              <label>Officer name *</label>
-              <input id="officer" type="text" autocomplete="off" placeholder="LAST, First"/>
+              <label>Officer last name *</label>
+              <input id="officerLast" type="text" autocomplete="off" placeholder="LAST"/>
+            </div>
+            <div class="fg">
+              <label>Officer first name *</label>
+              <input id="officerFirst" type="text" autocomplete="off" placeholder="First"/>
             </div>
             <div class="fg">
               <label>Badge number *</label>
@@ -196,7 +206,7 @@
       const s = document.createElement('script');
       s.async = true;
       s.defer = true;
-      s.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyAcvadlqFCkXrGZxGbVAGk_SY9lzTZ9fBU&libraries=places&callback=initKioskMaps';
+      s.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyCH7LsX-KNJ8rAZmTfo7mCN44sL129Y5i4&libraries=places&callback=initKioskMaps';
       document.head.appendChild(s);
     })();
   </script>
