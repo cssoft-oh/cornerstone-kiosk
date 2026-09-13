@@ -19,7 +19,16 @@
 
 // Config — swap in per-deploy via a build step later. Baked as literals now
 // so the kiosk works with a single static-file deploy.
-const KIOSK_USER = 'arrest';
+//
+// Auth model: the kiosk is a demo terminal in the sally-port. It gates on
+// the shared password only; the username field is captured for the audit
+// trail (which officer signed in) but doesn't have to match a specific
+// value. Real identity is enforced downstream at Jail when a booking
+// officer accepts the submission. If we required a magic username here
+// too, officers who don't have the login hint stare at "Incorrect user
+// or password" forever — which is exactly the "Welcome1! doesn't work"
+// bug reported against the demo.
+const KIOSK_USER = 'arrest';   // accepted, plus any non-empty value
 const KIOSK_PASS = 'Welcome1!';
 const JAIL_API_BASE = 'https://jail.cornerstonetech.online/api';
 const IDLE_LOCK_MS = 5 * 60 * 1000;
@@ -50,11 +59,22 @@ function kioskLogin(e) {
   const user = (document.getElementById('user').value || '').trim();
   const pw = document.getElementById('pw').value || '';
   const errEl = document.getElementById('loginErr');
-  if (user !== KIOSK_USER || pw !== KIOSK_PASS) {
-    errEl.textContent = 'Incorrect user or password.';
+  // Password gate only — the username is recorded for the audit trail
+  // but is not checked against a magic value. Any non-empty username
+  // paired with the shared kiosk password unlocks the terminal.
+  if (!user) {
+    errEl.textContent = 'Enter your name or badge to unlock the kiosk.';
     errEl.style.display = 'block';
     return false;
   }
+  if (pw !== KIOSK_PASS) {
+    errEl.textContent = 'Incorrect password. Ask the on-duty booking officer for the kiosk password.';
+    errEl.style.display = 'block';
+    return false;
+  }
+  // Stash the signed-in identifier so the submitted arrival can carry
+  // it forward as who-signed-in-at-the-kiosk.
+  try { window._kioskSessionUser = user; } catch(_){}
   errEl.style.display = 'none';
   document.getElementById('user').value = '';
   document.getElementById('pw').value = '';
@@ -337,6 +357,10 @@ async function submitIntake() {
   payload.source = 'kiosk';
   payload.origin = window.location.hostname;
   payload.submittedAt = new Date().toISOString();
+  // Signed-in kiosk user carries onto the arrival for the audit trail.
+  // Booking sees who was standing at the terminal when the row was
+  // submitted, separately from the arresting officer named on the form.
+  try { if (window._kioskSessionUser) payload.kioskSessionUser = window._kioskSessionUser; } catch(_){}
   submitBtn.disabled = true;
   submitBtn.textContent = 'Submitting…';
   try {
